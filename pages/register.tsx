@@ -1,10 +1,12 @@
-"use client"; // Add this directive at the top
+"use client"; // Ensure this directive is at the top
 
 import React, { useState } from "react";
+import Image from "next/image";
 
 const Form = () => {
-    const [membershipCategory, setMembershipCategory] = useState("");
-    const [image, setImage] = useState(null);
+    const [membershipCategory, setMembershipCategory] = useState<string>("");
+    const [image, setImage] = useState<File | null>(null);
+    const [preview, setPreview] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         name_bengali: "",
         name_english: "",
@@ -17,79 +19,84 @@ const Form = () => {
         marital_status: "",
         membership_category: "",
     });
-    const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
+    const [error, setError] = useState<string>("");
+    const [message, setMessage] = useState<string>("");
 
-    // Handle form input changes
+    // Handle text input changes
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setFormData({
-            ...formData,
+        setFormData((prev) => ({
+            ...prev,
             [name]: value,
-        });
+        }));
     };
 
     // Handle file input change
     const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files ? e.target.files[0] : null;
+        const file = e.target.files?.[0];
         if (file) {
-            const imgData = new FileReader();
-            imgData.onload = () => {
-                if (imgData.readyState === 2) {
-                    setImage(imgData.result as string);
-                }
+            setImage(file);
+            const reader = new FileReader();
+            reader.onload = () => {
+                setPreview(reader.result as string);
             };
-            imgData.readAsDataURL(file);
+            reader.readAsDataURL(file);
         }
     };
 
-    // Calculate Registration Fee
-    let fee = 0;
-    if (membershipCategory === "Life Member") fee = 1000;
-    if (membershipCategory === "Executive Member") fee = 500;
-    if (membershipCategory === "General Member") fee = 200;
+    // Handle membership category selection
+    const handleMembershipChange = (value: string) => {
+        setMembershipCategory(value);
+        setFormData((prev) => ({
+            ...prev,
+            membership_category: value,
+        }));
+    };
 
+    // Calculate Registration Fee
+    const fee = membershipCategory === "Life Member" ? 1000
+        : membershipCategory === "Executive Member" ? 500
+        : membershipCategory === "General Member" ? 200
+        : 0;
+
+    // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const { name_bengali, name_english, ssc_batch, address_present, address_permanent, phone, email, occupation, marital_status } = formData;
+        const { name_bengali, name_english, phone, email, membership_category } = formData;
 
-        if (!name_bengali || !name_english || !phone || !email || !membershipCategory) {
+        // Form validation
+        if (!name_bengali || !name_english || !phone || !email || !membership_category) {
             setError("Please fill in all the required fields.");
             return;
         }
 
+        // Prepare FormData for submission
+        const formDataToSend = new FormData();
+        Object.entries(formData).forEach(([key, value]) => {
+            formDataToSend.append(key, value);
+        });
+
+        if (image) {
+            formDataToSend.append("image", image);
+        }
+
         try {
-            const res = await fetch('/api/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    name_bengali,
-                    name_english,
-                    ssc_batch,
-                    address_present,
-                    address_permanent,
-                    phone,
-                    email,
-                    occupation,
-                    marital_status,
-                    membership_category: membershipCategory,
-                    image, // You can upload the image later to a cloud storage or directly to the backend
-                }),
+            const res = await fetch("/api/register", {
+                method: "POST",
+                body: formDataToSend,
             });
 
-            const data = await res.json();
-            if (res.ok) {
-                setMessage(data.message);
-                setError("");
-            } else {
-                setError(data.message);
-                setMessage("");
+            if (!res.ok) {
+                throw new Error("Server returned an error");
             }
+
+            const data = await res.json();
+            setMessage(data.message);
+            setError("");
         } catch (error) {
-            setError("An error occurred while submitting the form.");
+            console.error("Fetch error:", error);
+            setError("An error occurred while submitting the form. Please try again.");
         }
     };
 
@@ -106,11 +113,14 @@ const Form = () => {
             <div className="w-full">
                 {/* Image Input */}
                 <div>
-                    {image && (
-                        <img
+                    {preview && (
+                        <Image
                             className="border-amber-300 mb-2 border-2 mx-auto w-60 h-60 rounded-full"
-                            src={image}
+                            src={preview}
                             alt="Uploaded Preview"
+                            width={240}
+                            height={240}
+                            priority
                         />
                     )}
                     <input
@@ -179,7 +189,7 @@ const Form = () => {
                                 name="membership_category"
                                 value={value}
                                 checked={membershipCategory === value}
-                                onChange={() => setMembershipCategory(value)}
+                                onChange={() => handleMembershipChange(value)}
                                 className="accent-blue-500"
                             />
                             <span>{label}</span>
