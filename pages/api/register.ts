@@ -99,7 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             console.log("✅ Member saved successfully!");
             return res.status(201).json({ message: "Member registered successfully!" });
-        } catch (error) {
+        } catch (error:any) {
             console.error("❌ Registration error:", error);
             return res.status(500).json({ message: "Internal Server Error", error: error.message });
         }
