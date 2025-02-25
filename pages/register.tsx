@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
+import axios from "axios";
 
 const Form = () => {
     const [membershipCategory, setMembershipCategory] = useState<string>("");
@@ -60,45 +61,50 @@ const Form = () => {
         : 0;
 
     // Handle form submission
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+  
+const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-        const { name_bengali, name_english, phone, email, membership_category } = formData;
+    const { name_bengali, name_english, phone, email, membership_category } = formData;
 
-        // Form validation
-        if (!name_bengali || !name_english || !phone || !email || !membership_category) {
-            setError("Please fill in all the required fields.");
-            return;
+    // Form validation
+    if (!name_bengali || !name_english || !phone || !email || !membership_category) {
+        setError("Please fill in all the required fields.");
+        return;
+    }
+
+    // Prepare FormData for submission
+    const formDataToSend = new FormData();
+    Object.entries(formData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+            formDataToSend.append(key, String(value)); // Ensure all values are strings
         }
+    });
 
-        // Prepare FormData for submission
-        const formDataToSend = new FormData();
-        Object.entries(formData).forEach(([key, value]) => {
-            formDataToSend.append(key, value);
+    if (image instanceof File) {
+        formDataToSend.append("image", image);
+    }
+
+    try {
+        const { data } = await axios.post("/api/register", formDataToSend, {
+            headers: {
+                "Content-Type": "multipart/form-data", // Important for FormData
+            },
         });
 
-        if (image) {
-            formDataToSend.append("image", image);
+        setMessage(data.message);
+        setError("");
+    } catch (error) {
+        console.error("Axios error:", error);
+
+        if (axios.isAxiosError(error) && error.response) {
+            setError(error.response.data?.message || "An error occurred while submitting the form.");
+        } else {
+            setError("An unexpected error occurred. Please try again.");
         }
-
-        try {
-            const res = await fetch("/api/register", {
-                method: "POST",
-                body: formDataToSend,
-            });
-
-            if (!res.ok) {
-                throw new Error("Server returned an error");
-            }
-
-            const data = await res.json();
-            setMessage(data.message);
-            setError("");
-        } catch (error) {
-            console.error("Fetch error:", error);
-            setError("An error occurred while submitting the form. Please try again.");
-        }
-    };
+    }
+};
+    
 
     return (
         <form onSubmit={handleSubmit} className="w-full">
