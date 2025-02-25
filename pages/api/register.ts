@@ -1,8 +1,4 @@
 
-
-/* eslint-disable */
-
-
 import { NextApiRequest, NextApiResponse } from "next";
 import dbConnect from "../../utils/dbConnect";
 import Member from "../../models/member";
@@ -40,8 +36,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
             // Convert fields from arrays to strings (in case they are arrays)
             const data = Object.fromEntries(
-                Object.entries(fields).map(([key, value]) => [key, value[0]])
+                Object.entries(fields).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
             );
+            
 
             const {
                 name_bengali,
