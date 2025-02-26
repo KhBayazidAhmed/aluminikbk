@@ -8,7 +8,10 @@ export const config = {
   },
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method Not Allowed" });
   }
@@ -21,7 +24,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ message: "Error parsing form data" });
     }
 
-    if (!files.image || !Array.isArray(files.image) || files.image.length === 0) {
+    if (
+      !files.image ||
+      !Array.isArray(files.image) ||
+      files.image.length === 0
+    ) {
       return res.status(400).json({ message: "No image provided" });
     }
 
@@ -39,9 +46,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         message: "Upload successful",
         imageUrl: uploadedImage.secure_url,
       });
-    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
       console.error("❌ Cloudinary Upload Error:", error);
-      return res.status(500).json({ message: "Upload failed", error: error.message });
+      return res
+        .status(500)
+        .json({ message: "Upload failed", error: error.message });
     }
   });
 }
