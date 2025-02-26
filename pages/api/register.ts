@@ -1,13 +1,20 @@
-
 import { NextApiRequest, NextApiResponse } from "next";
 import dbConnect from "../../utils/dbConnect";
 import Member from "../../models/member";
-import { IncomingForm, Files } from "formidable"; // Ensure correct typing
+import { IncomingForm } from "formidable";
 import fs from "fs";
+import { v2 as cloudinary } from "cloudinary"; // Import Cloudinary
+
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export const config = {
     api: {
-        bodyParser: false, // Disable automatic body parsing to handle file uploads
+        bodyParser: false, // Disable automatic body parsing for file uploads
     },
 };
 
@@ -19,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("📩 Incoming request...");
 
-    const form = new IncomingForm({ multiples: true });
+    const form = new IncomingForm({ multiples: false }); // Assuming one image per user
 
     form.parse(req, async (err, fields, files) => {
         if (err) {
@@ -34,11 +41,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await dbConnect();
 
         try {
-            // Convert fields from arrays to strings (in case they are arrays)
+            // Convert fields to proper format
             const data = Object.fromEntries(
                 Object.entries(fields).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
             );
-            
 
             const {
                 name_bengali,
@@ -64,20 +70,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 return res.status(400).json({ message: "Email is already registered." });
             }
 
-            // Handle image upload (optional)
-            let imagePath = "";
-            if (files.image && Array.isArray(files.image)) {
-                const file = files.image[0]; // Assuming it's an array (since `multiples: true`)
+            // Handle Cloudinary image upload
+            let imageUrl = "";
+            if (files.image) {
+                const file = Array.isArray(files.image) ? files.image[0] : files.image;
+
                 try {
-                    const data = await fs.promises.readFile(file.filepath);
-                    imagePath = `data:${file.mimetype};base64,${data.toString("base64")}`;
-                } catch (fileError) {
-                    console.error("❌ Error reading image file:", fileError);
-                    return res.status(500).json({ message: "Error processing image." });
+                    const uploadedImage = await cloudinary.uploader.upload(file.filepath, {
+                        folder: "nextjs_uploads",
+                    });
+                    imageUrl = uploadedImage.secure_url;
+                } catch (uploadError:any) {
+                    console.error("❌ Error uploading image:", uploadError);
+                    return res.status(500).json({ message: "Error uploading image." });
                 }
             }
 
-            // Create and save the new member to the database
+            // Create and save the new member
             const newMember = new Member({
                 name_bengali,
                 name_english,
@@ -89,17 +98,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 occupation,
                 marital_status,
                 membership_category,
-                image: imagePath, // Store image in base64 format
+                image: imageUrl, // Store Cloudinary URL instead of base64
             });
 
             await newMember.save();
 
             console.log("✅ Member saved successfully!");
             return res.status(201).json({ message: "Member registered successfully!" });
-        } catch (error:any) {
+        } catch (error: any) {
             console.error("❌ Registration error:", error);
             return res.status(500).json({ message: "Internal Server Error", error: error.message });
         }
     });
 }
-
